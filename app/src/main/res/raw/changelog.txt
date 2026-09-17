@@ -1,0 +1,5 @@
+v1.0
+- Feature: First release of My Calculator native Android app
+- Feature: High precision scientific calculator with 101 golden tests passed
+- Feature: Fraction, Sexagesimal, Complex, and Engineering formatting
+- Feature: Complete offline privacy with zero permissions
