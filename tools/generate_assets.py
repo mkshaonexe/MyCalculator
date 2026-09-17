@@ -2,6 +2,7 @@
 import os
 import re
 import xml.etree.ElementTree as ET
+import svgelements
 
 SVG_PATH = "/Users/mkshaon/playground/schulrechner/www/img/gui/Classic_by_Joris Yidong Scholl.svg"
 RES_DRAWABLE = "/Users/mkshaon/playground/MyCalculator/app/src/main/res/drawable"
@@ -191,6 +192,18 @@ def generate_vector_drawable(content_xml, has_aapt=False):
         f'</vector>\n'
     )
 
+def generate_vector_drawable_plain(content_xml):
+    return (
+        f'<?xml version="1.0" encoding="utf-8"?>\n'
+        f'<vector xmlns:android="http://schemas.android.com/apk/res/android"\n'
+        f'    android:width="248.67dp"\n'
+        f'    android:height="491.2dp"\n'
+        f'    android:viewportWidth="{VIEWPORT_WIDTH}"\n'
+        f'    android:viewportHeight="{VIEWPORT_HEIGHT}">\n'
+        f'{content_xml}\n'
+        f'</vector>\n'
+    )
+
 # 1. Generate key backgrounds (50 files)
 key_bg_elements = [e for e in root.iter() if e.attrib.get("id", "").startswith("label_background_")]
 key_bg_map = {}
@@ -300,8 +313,82 @@ with open(os.path.join(RES_DRAWABLE, "calc_body.xml"), "w", encoding="utf-8") as
     f.write(body_drawable)
 print("Generated calc_body.xml.")
 
-labels_content = build_elements_xml(labels_elements, indent="        ")
-labels_drawable = generate_vector_drawable(labels_content, has_aapt=False)
+# Generate calc_labels.xml using svgelements to bake all nested transforms directly
+print("Parsing SVG with svgelements for calc_labels...")
+svg_model = svgelements.SVG.parse(SVG_PATH)
+layer1_svg = next(c for c in svg_model if getattr(c, "id", None) == "layer1")
+bg_indices_svg = [i for i, e in enumerate(layer1_svg) if getattr(e, "id", "").startswith("label_background_")]
+max_bg_idx_svg = max(bg_indices_svg)
+labels_elements_svg = list(layer1_svg)[max_bg_idx_svg + 1:]
+
+def get_leaf_shapes(elem):
+    if any(getattr(elem, "id", "").startswith(p) for p in excluded_prefixes):
+        return []
+    if isinstance(elem, svgelements.Group):
+        res = []
+        for child in elem:
+            res.extend(get_leaf_shapes(child))
+        return res
+    elif isinstance(elem, svgelements.Shape):
+        return [elem]
+    return []
+
+all_label_shapes = []
+for e in labels_elements_svg:
+    all_label_shapes.extend(get_leaf_shapes(e))
+
+def format_svgelements_shape(s, indent="        "):
+    p = svgelements.Path(s)
+    d = p.d()
+    if not d or not d.strip():
+        return ""
+    
+    attrs = []
+    if s.fill is not None and s.fill.hex is not None:
+        attrs.append(f'android:fillColor="{s.fill.hex}"')
+    else:
+        attrs.append('android:fillColor="@android:color/transparent"')
+        
+    if s.stroke is not None and s.stroke.hex is not None:
+        attrs.append(f'android:strokeColor="{s.stroke.hex}"')
+        attrs.append(f'android:strokeWidth="{s.stroke_width:.4f}"')
+        cap = s.values.get("stroke-linecap")
+        if cap in ("round", "square", "butt"):
+            attrs.append(f'android:strokeLineCap="{cap}"')
+        join = s.values.get("stroke-linejoin")
+        if join in ("round", "bevel", "miter"):
+            attrs.append(f'android:strokeLineJoin="{join}"')
+        miter = s.values.get("stroke-miterlimit")
+        if miter:
+            attrs.append(f'android:strokeMiterLimit="{miter}"')
+            
+    try:
+        op = float(s.values.get("opacity", 1.0))
+    except (ValueError, TypeError):
+        op = 1.0
+    try:
+        f_op = float(s.values.get("fill-opacity", 1.0))
+    except (ValueError, TypeError):
+        f_op = 1.0
+    try:
+        s_op = float(s.values.get("stroke-opacity", 1.0))
+    except (ValueError, TypeError):
+        s_op = 1.0
+        
+    fill_alpha = op * f_op
+    if fill_alpha < 0.999:
+        attrs.append(f'android:fillAlpha="{fill_alpha:.4f}"')
+        
+    stroke_alpha = op * s_op
+    if stroke_alpha < 0.999:
+        attrs.append(f'android:strokeAlpha="{stroke_alpha:.4f}"')
+        
+    attr_str = "\n".join(f"{indent}    {a}" for a in attrs)
+    sid = getattr(s, "id", "")
+    return f'{indent}<!-- {sid} -->\n{indent}<path\n{attr_str}\n{indent}    android:pathData="{d}" />'
+
+labels_content = "\n".join(filter(None, (format_svgelements_shape(s) for s in all_label_shapes)))
+labels_drawable = generate_vector_drawable_plain(labels_content)
 with open(os.path.join(RES_DRAWABLE, "calc_labels.xml"), "w", encoding="utf-8") as f:
     f.write(labels_drawable)
 print("Generated calc_labels.xml.")
