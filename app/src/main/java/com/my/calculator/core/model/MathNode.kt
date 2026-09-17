@@ -27,6 +27,7 @@ open class MathNode(
     ): String {
         return when {
             varName == "X" -> "X"
+            varName == "i" -> "i"
             varName == "Ans" -> {
                 when (lastResult) {
                     null -> "undefined"

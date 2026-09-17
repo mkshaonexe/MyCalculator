@@ -13,10 +13,6 @@ open class EquationInputHandler(
 
     var inputCodeHistory: MutableList<String> = mutableListOf()
 
-    init {
-        updateDisplay(true)
-    }
-
     override fun handle(inputCode: String) {
         if (inputCode == "key_shift") {
             context.toggleMode("shift")
