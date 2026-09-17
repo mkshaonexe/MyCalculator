@@ -5,7 +5,7 @@
     android:viewportWidth="2486.6667"
     android:viewportHeight="4912.0">
     <group android:translateX="-1.6006437" android:translateY="0.31985911">
-        <group android:scaleX="0.79145251" android:scaleY="-1.0" android:translateX="427.51972" android:translateY="1621.9647">
+        <group android:scaleX="0.791453" android:scaleY="-1" android:translateX="427.51972" android:translateY="1621.9647">
             <path
                 android:fillColor="#3f4266"
                 android:pathData="m 1962.1233,778.31185 38.8587,66.41486 40.7658,-67.31406 z" />

@@ -38,24 +38,43 @@ def parse_style(style_str):
     return res
 
 def parse_transform(t_str):
-    # Returns (scaleX, scaleY, transX, transY)
+    # Returns dict of Android group XML attributes
+    attrs = {}
     if not t_str:
-        return (1.0, 1.0, 0.0, 0.0)
+        return attrs
     t_str = t_str.strip()
     if t_str.startswith("translate"):
         nums = [float(x) for x in re.findall(r'[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?', t_str)]
         tx = nums[0]
         ty = nums[1] if len(nums) > 1 else 0.0
-        return (1.0, 1.0, tx, ty)
+        if abs(tx) > 1e-6:
+            attrs['android:translateX'] = f"{tx:.6f}".rstrip('0').rstrip('.')
+        if abs(ty) > 1e-6:
+            attrs['android:translateY'] = f"{ty:.6f}".rstrip('0').rstrip('.')
     elif t_str.startswith("matrix"):
         nums = [float(x) for x in re.findall(r'[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?', t_str)]
         # matrix(a, b, c, d, e, f)
-        sx = nums[0]
-        sy = nums[3]
-        tx = nums[4]
-        ty = nums[5]
-        return (sx, sy, tx, ty)
-    return (1.0, 1.0, 0.0, 0.0)
+        sx, sy, tx, ty = nums[0], nums[3], nums[4], nums[5]
+        if abs(sx - 1.0) > 1e-6:
+            attrs['android:scaleX'] = f"{sx:.6f}".rstrip('0').rstrip('.')
+        if abs(sy - 1.0) > 1e-6:
+            attrs['android:scaleY'] = f"{sy:.6f}".rstrip('0').rstrip('.')
+        if abs(tx) > 1e-6:
+            attrs['android:translateX'] = f"{tx:.6f}".rstrip('0').rstrip('.')
+        if abs(ty) > 1e-6:
+            attrs['android:translateY'] = f"{ty:.6f}".rstrip('0').rstrip('.')
+    elif t_str.startswith("rotate"):
+        nums = [float(x) for x in re.findall(r'[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?', t_str)]
+        angle = nums[0]
+        cx = nums[1] if len(nums) > 1 else 0.0
+        cy = nums[2] if len(nums) > 2 else 0.0
+        if abs(angle) > 1e-6:
+            attrs['android:rotation'] = f"{angle:.6f}".rstrip('0').rstrip('.')
+            if len(nums) > 1:
+                attrs['android:pivotX'] = f"{cx:.6f}".rstrip('0').rstrip('.')
+            if len(nums) > 2:
+                attrs['android:pivotY'] = f"{cy:.6f}".rstrip('0').rstrip('.')
+    return attrs
 
 def element_to_path_data(elem):
     tag = elem.tag.split("}")[-1]
@@ -196,8 +215,9 @@ for elem in indicator_elements:
     indicator_map[name] = res_name
     
     t = elem.attrib.get("transform")
-    sx, sy, tx, ty = parse_transform(t)
-    has_grp_transform = (sx != 1.0 or sy != 1.0 or tx != 0.0 or ty != 0.0)
+    grp_attrs = parse_transform(t)
+    has_grp_transform = bool(grp_attrs)
+    attr_s = " ".join(f'{k}="{v}"' for k, v in grp_attrs.items())
     
     paths_xml = []
     if elem.tag.split("}")[-1] == "g":
@@ -212,12 +232,6 @@ for elem in indicator_elements:
             
     inner_xml = "\n".join(paths_xml)
     if has_grp_transform:
-        grp_attrs = []
-        if sx != 1.0: grp_attrs.append(f'android:scaleX="{sx}"')
-        if sy != 1.0: grp_attrs.append(f'android:scaleY="{sy}"')
-        if tx != 0.0: grp_attrs.append(f'android:translateX="{tx}"')
-        if ty != 0.0: grp_attrs.append(f'android:translateY="{ty}"')
-        attr_s = " ".join(grp_attrs)
         content_xml = f'        <group {attr_s}>\n{inner_xml}\n        </group>'
     else:
         content_xml = inner_xml
@@ -251,26 +265,25 @@ def build_elements_xml(elements, indent="        "):
             continue
             
         tag = child.tag.split("}")[-1]
+        t = child.attrib.get("transform")
+        grp_attrs = parse_transform(t)
+        has_transform = bool(grp_attrs)
+        attr_s = " ".join(f'{k}="{v}"' for k, v in grp_attrs.items())
+
         if tag == "g":
-            t = child.attrib.get("transform")
-            sx, sy, tx, ty = parse_transform(t)
-            has_grp_transform = (sx != 1.0 or sy != 1.0 or tx != 0.0 or ty != 0.0)
-            sub_xml = build_elements_xml(child, indent + ("    " if has_grp_transform else ""))
+            sub_xml = build_elements_xml(child, indent + ("    " if has_transform else ""))
             if sub_xml.strip():
-                if has_grp_transform:
-                    grp_attrs = []
-                    if sx != 1.0: grp_attrs.append(f'android:scaleX="{sx}"')
-                    if sy != 1.0: grp_attrs.append(f'android:scaleY="{sy}"')
-                    if tx != 0.0: grp_attrs.append(f'android:translateX="{tx}"')
-                    if ty != 0.0: grp_attrs.append(f'android:translateY="{ty}"')
-                    attr_s = " ".join(grp_attrs)
+                if has_transform:
                     chunks.append(f'{indent}<group {attr_s}>\n{sub_xml}\n{indent}</group>')
                 else:
                     chunks.append(sub_xml)
         elif tag in ("path", "rect", "circle", "ellipse"):
-            pxml = format_path_xml(child, indent=indent)
+            pxml = format_path_xml(child, indent=(indent + "    ") if has_transform else indent)
             if pxml:
-                chunks.append(pxml)
+                if has_transform:
+                    chunks.append(f'{indent}<group {attr_s}>\n{pxml}\n{indent}</group>')
+                else:
+                    chunks.append(pxml)
     return "\n".join(chunks)
 
 layer1 = root.find("{http://www.w3.org/2000/svg}g[@id=\"layer1\"]")
