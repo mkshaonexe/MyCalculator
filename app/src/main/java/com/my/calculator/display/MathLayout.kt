@@ -13,7 +13,8 @@ data class LayoutBox(
     var x: Float = 0f,
     var y: Float = 0f,
     val children: MutableList<LayoutBox> = mutableListOf(),
-    var isCursor: Boolean = false
+    var isCursor: Boolean = false,
+    var fontSize: Float = 0f
 )
 
 class MathMeasurer(
@@ -41,17 +42,17 @@ class MathMeasurer(
             is DisplayNode.Text -> {
                 paint.typeface = if (node.italic) italicTypeface else regularTypeface
                 val w = paint.measureText(node.text)
-                LayoutBox(node, width = w, height = baseHeight, ascent = baseAscent, descent = baseDescent)
+                LayoutBox(node, width = w, height = baseHeight, ascent = baseAscent, descent = baseDescent, fontSize = fontSize)
             }
             is DisplayNode.Placeholder -> {
                 val w = paint.measureText("▯")
-                LayoutBox(node, width = w, height = baseHeight, ascent = baseAscent, descent = baseDescent)
+                LayoutBox(node, width = w, height = baseHeight, ascent = baseAscent, descent = baseDescent, fontSize = fontSize)
             }
             is DisplayNode.Cursor -> {
-                LayoutBox(node, width = 4f, height = baseHeight, ascent = baseAscent, descent = baseDescent, isCursor = true)
+                LayoutBox(node, width = 4f, height = baseHeight, ascent = baseAscent, descent = baseDescent, isCursor = true, fontSize = fontSize)
             }
             is DisplayNode.LineBreak -> {
-                LayoutBox(node, width = 0f, height = baseHeight, ascent = baseAscent, descent = baseDescent)
+                LayoutBox(node, width = 0f, height = baseHeight, ascent = baseAscent, descent = baseDescent, fontSize = fontSize)
             }
             is DisplayNode.Frac -> {
                 val fracFontSize = 0.667f * rem
@@ -72,7 +73,7 @@ class MathMeasurer(
                 bottomBox.y = topBox.height + barThickness + 2 * gap
 
                 val totalH = bottomBox.y + bottomBox.height
-                val box = LayoutBox(node, width = totalW, height = totalH, ascent = totalH / 2f, descent = totalH / 2f)
+                val box = LayoutBox(node, width = totalW, height = totalH, ascent = totalH / 2f, descent = totalH / 2f, fontSize = fontSize)
                 box.children.add(topBox)
                 box.children.add(bottomBox)
                 box
@@ -87,36 +88,53 @@ class MathMeasurer(
                 radBox.x = sqrtW
                 radBox.y = (totalH - radBox.height) / 2f
 
-                val box = LayoutBox(node, width = totalW, height = totalH, ascent = baseAscent, descent = baseDescent)
+                val box = LayoutBox(node, width = totalW, height = totalH, ascent = baseAscent, descent = baseDescent, fontSize = fontSize)
                 box.children.add(radBox)
                 box
             }
             is DisplayNode.SupScript -> {
                 val subFontSize = 0.667f * rem
                 val contentBox = measure(node.content, subFontSize)
-                val shiftY = -0.35f * fontSize
-                contentBox.y = shiftY
-                val box = LayoutBox(node, width = contentBox.width, height = contentBox.height, ascent = baseAscent + 0.35f * fontSize, descent = baseDescent)
+                val shiftUp = 0.45f * fontSize
+                val ascent = contentBox.ascent + shiftUp
+                val descent = max(0f, contentBox.descent - shiftUp)
+                val totalH = ascent + descent
+                contentBox.x = 0f
+                contentBox.y = 0f
+                val box = LayoutBox(node, width = contentBox.width, height = totalH, ascent = ascent, descent = descent, fontSize = fontSize)
                 box.children.add(contentBox)
                 box
             }
             is DisplayNode.SubScript -> {
                 val subFontSize = 0.667f * rem
                 val contentBox = measure(node.content, subFontSize)
-                val shiftY = 0.35f * fontSize
-                contentBox.y = shiftY
-                val box = LayoutBox(node, width = contentBox.width, height = contentBox.height, ascent = baseAscent, descent = baseDescent + 0.35f * fontSize)
+                val shiftDown = 0.25f * fontSize
+                val ascent = max(0f, contentBox.ascent - shiftDown)
+                val descent = contentBox.descent + shiftDown
+                val totalH = ascent + descent
+                contentBox.x = 0f
+                contentBox.y = if (contentBox.ascent < shiftDown) shiftDown - contentBox.ascent else 0f
+                val box = LayoutBox(node, width = contentBox.width, height = totalH, ascent = ascent, descent = descent, fontSize = fontSize)
                 box.children.add(contentBox)
                 box
             }
             is DisplayNode.Pow -> {
                 val baseBox = measure(node.base, fontSize)
-                val expBox = measure(node.exp, 0.667f * rem)
-                expBox.x = baseBox.width
-                expBox.y = -0.35f * fontSize
+                val subFontSize = 0.667f * rem
+                val expBox = measure(node.exp, subFontSize)
+                val shiftUp = 0.45f * fontSize
+                val maxAscent = max(baseBox.ascent, expBox.ascent + shiftUp)
+                val maxDescent = max(baseBox.descent, expBox.descent - shiftUp)
+                val totalH = maxAscent + maxDescent
                 val totalW = baseBox.width + expBox.width
-                val totalH = max(baseBox.height, expBox.height + 0.35f * fontSize)
-                val box = LayoutBox(node, width = totalW, height = totalH, ascent = baseAscent, descent = baseDescent)
+
+                baseBox.x = 0f
+                baseBox.y = maxAscent - baseBox.ascent
+
+                expBox.x = baseBox.width
+                expBox.y = maxAscent - (expBox.ascent + shiftUp)
+
+                val box = LayoutBox(node, width = totalW, height = totalH, ascent = maxAscent, descent = maxDescent, fontSize = fontSize)
                 box.children.add(baseBox)
                 box.children.add(expBox)
                 box
@@ -141,12 +159,12 @@ class MathMeasurer(
                     cb.y = maxAscent - cb.ascent
                 }
 
-                val box = LayoutBox(node, width = curX, height = totalH, ascent = maxAscent, descent = maxDescent)
+                val box = LayoutBox(node, width = curX, height = totalH, ascent = maxAscent, descent = maxDescent, fontSize = fontSize)
                 box.children.addAll(childrenBoxes)
                 box
             }
             else -> {
-                LayoutBox(node, width = 0f, height = baseHeight, ascent = baseAscent, descent = baseDescent)
+                LayoutBox(node, width = 0f, height = baseHeight, ascent = baseAscent, descent = baseDescent, fontSize = fontSize)
             }
         }
     }

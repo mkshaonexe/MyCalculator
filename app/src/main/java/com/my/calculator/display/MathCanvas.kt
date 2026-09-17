@@ -64,16 +64,19 @@ fun MathCanvas(
             val nativeCanvas = composeCanvas.nativeCanvas
             nativeCanvas.save()
 
+            val padLeft = if (!alignRight) 0.111f * rootFontSizePx else 0f
+            val padTop = if (!alignRight) 0.222f * rootFontSizePx else 0f
+
             val startX = if (alignRight && availableWidth > layoutBox.width) {
                 availableWidth - layoutBox.width
             } else {
-                -scrollX
+                padLeft - scrollX
             }
 
             val startY = if (alignRight && availableHeight > layoutBox.height) {
                 availableHeight - layoutBox.height
             } else {
-                -scrollY
+                padTop - scrollY
             }
 
             nativeCanvas.translate(startX, startY)
@@ -116,12 +119,12 @@ private fun drawLayout(
     when (val node = box.node) {
         is DisplayNode.Text -> {
             textPaint.typeface = if (node.italic) italicTypeface else regularTypeface
-            textPaint.textSize = if (node.isSmall) 0.667f * rootFontSizePx else rootFontSizePx
+            textPaint.textSize = if (box.fontSize > 0f) box.fontSize else rootFontSizePx
             canvas.drawText(node.text, x, y + box.ascent, textPaint)
         }
         is DisplayNode.Placeholder -> {
             textPaint.typeface = regularTypeface
-            textPaint.textSize = rootFontSizePx
+            textPaint.textSize = if (box.fontSize > 0f) box.fontSize else rootFontSizePx
             canvas.drawText("▯", x, y + box.ascent, textPaint)
         }
         is DisplayNode.Cursor -> {
@@ -157,10 +160,11 @@ private fun drawLayout(
             }
             // Draw checkmark and overbar
             textPaint.typeface = regularTypeface
-            textPaint.textSize = rootFontSizePx
+            val sqrtFontSize = if (box.fontSize > 0f) box.fontSize else rootFontSizePx
+            textPaint.textSize = sqrtFontSize
             canvas.drawText("√", x, y + box.ascent, textPaint)
             val sqrtW = textPaint.measureText("√")
-            val barY = y + 0.111f * rootFontSizePx
+            val barY = y + 0.111f * sqrtFontSize
             canvas.drawLine(x + sqrtW, barY, x + box.width, barY, linePaint)
         }
         else -> {

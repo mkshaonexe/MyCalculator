@@ -43,4 +43,19 @@ class HtmlToDisplayNodeTest {
         assertTrue(row.children[1] is DisplayNode.Cursor)
         assertTrue(row.children[2] is DisplayNode.Placeholder)
     }
+
+    @Test
+    fun testPowerParse() {
+        val html = "<span class='pow_bottom'>(9)</span><span class='pow_top'>2</span>"
+        val node = HtmlToDisplayNode.parse(html)
+        assertTrue(node is DisplayNode.Row)
+        val row = node as DisplayNode.Row
+        assertEquals(2, row.children.size)
+        assertTrue(row.children[0] is DisplayNode.Text)
+        assertEquals("(9)", (row.children[0] as DisplayNode.Text).text)
+        assertTrue(row.children[1] is DisplayNode.SupScript)
+        val sup = row.children[1] as DisplayNode.SupScript
+        assertTrue(sup.content is DisplayNode.Text)
+        assertEquals("2", (sup.content as DisplayNode.Text).text)
+    }
 }
