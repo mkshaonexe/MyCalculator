@@ -150,7 +150,13 @@ private fun drawLayout(
             }
         }
         is DisplayNode.Sqrt -> {
-            // Draw radicand
+            val sqrtFontSize = if (box.fontSize > 0f) box.fontSize else rootFontSizePx
+            val barThickness = 0.111f * sqrtFontSize
+            textPaint.typeface = regularTypeface
+            textPaint.textSize = sqrtFontSize
+            val sqrtW = textPaint.measureText("√")
+
+            // 1. Draw radicand
             for (ch in box.children) {
                 drawLayout(
                     canvas, ch, x, y,
@@ -158,14 +164,28 @@ private fun drawLayout(
                     regularTypeface, italicTypeface, rootFontSizePx, cursorVisible
                 )
             }
-            // Draw checkmark and overbar
+
+            // 2. Draw scaled √ checkmark
+            val scaleY = if (sqrtFontSize > 0f) box.height / sqrtFontSize else 1f
+            canvas.save()
+            canvas.translate(x, y)
+            canvas.scale(1f, scaleY)
             textPaint.typeface = regularTypeface
-            val sqrtFontSize = if (box.fontSize > 0f) box.fontSize else rootFontSizePx
             textPaint.textSize = sqrtFontSize
-            canvas.drawText("√", x, y + box.ascent, textPaint)
-            val sqrtW = textPaint.measureText("√")
-            val barY = y + 0.111f * sqrtFontSize
-            canvas.drawLine(x + sqrtW, barY, x + box.width, barY, linePaint)
+            canvas.drawText("√", 0f, sqrtFontSize, textPaint)
+            canvas.restore()
+
+            // 3. Draw horizontal overbar
+            val oldStrokeWidth = linePaint.strokeWidth
+            val oldCap = linePaint.strokeCap
+            linePaint.strokeWidth = barThickness
+            linePaint.strokeCap = Paint.Cap.BUTT
+            val barY = y + barThickness / 2f
+            val startBarX = x + sqrtW - barThickness
+            val endBarX = x + box.width
+            canvas.drawLine(startBarX, barY, endBarX, barY, linePaint)
+            linePaint.strokeWidth = oldStrokeWidth
+            linePaint.strokeCap = oldCap
         }
         else -> {
             for (ch in box.children) {

@@ -82,13 +82,19 @@ class MathMeasurer(
                 val radBox = measure(node.radicand, fontSize)
                 val sqrtW = paint.measureText("√")
                 val padR = 0.222f * fontSize
+                val barThickness = 0.111f * fontSize
+                val gap = 0.111f * fontSize
+                val topPadding = barThickness + gap
                 val totalW = sqrtW + radBox.width + padR
-                val totalH = max(baseHeight, radBox.height)
+                val totalH = radBox.height + topPadding
 
                 radBox.x = sqrtW
-                radBox.y = (totalH - radBox.height) / 2f
+                radBox.y = topPadding
 
-                val box = LayoutBox(node, width = totalW, height = totalH, ascent = baseAscent, descent = baseDescent, fontSize = fontSize)
+                val ascent = topPadding + radBox.ascent
+                val descent = radBox.descent
+
+                val box = LayoutBox(node, width = totalW, height = totalH, ascent = ascent, descent = descent, fontSize = fontSize)
                 box.children.add(radBox)
                 box
             }

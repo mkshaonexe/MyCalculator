@@ -58,4 +58,14 @@ class HtmlToDisplayNodeTest {
         assertTrue(sup.content is DisplayNode.Text)
         assertEquals("2", (sup.content as DisplayNode.Text).text)
     }
+
+    @Test
+    fun testSqrtWithNumber() {
+        val html = "<span class='sqrt_wrapper'><span class='scale_height'>√</span><span class='sqrt'>5</span></span>"
+        val node = HtmlToDisplayNode.parse(html)
+        assertTrue(node is DisplayNode.Sqrt)
+        val sqrt = node as DisplayNode.Sqrt
+        assertTrue(sqrt.radicand is DisplayNode.Text)
+        assertEquals("5", (sqrt.radicand as DisplayNode.Text).text)
+    }
 }
