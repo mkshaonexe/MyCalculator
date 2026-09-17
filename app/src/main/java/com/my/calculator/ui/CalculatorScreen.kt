@@ -65,7 +65,14 @@ fun CalculatorScreen(
                 )
             }
 
-            // 3. Comma / Point Label
+            // 3. Calculator Labels (all button texts, numbers, operations, shift/alpha markings)
+            Image(
+                painter = painterResource(R.drawable.calc_labels),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // 4. Comma / Point Label
             val commaRes = if (viewModel.settings.decimalFormat == "comma") {
                 R.drawable.label_comma_de
             } else {

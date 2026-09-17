@@ -237,12 +237,12 @@ for eid, out_name in [("label_comma_de_DE", "label_comma_de"), ("label_comma_en_
         f.write(generate_vector_drawable(xml_body))
 print("Generated label_comma_de.xml and label_comma_en.xml.")
 
-# 4. Generate calc_body.xml
+# 4. Generate calc_body.xml and calc_labels.xml
 excluded_prefixes = ("key_", "label_background_", "indicator_", "display_", "scroll_", "label_comma_")
 
-def build_group_tree_xml(parent, indent="        "):
+def build_elements_xml(elements, indent="        "):
     chunks = []
-    for child in parent:
+    for child in elements:
         cid = child.attrib.get("id", "")
         if any(cid.startswith(p) for p in excluded_prefixes):
             continue
@@ -255,7 +255,7 @@ def build_group_tree_xml(parent, indent="        "):
             t = child.attrib.get("transform")
             sx, sy, tx, ty = parse_transform(t)
             has_grp_transform = (sx != 1.0 or sy != 1.0 or tx != 0.0 or ty != 0.0)
-            sub_xml = build_group_tree_xml(child, indent + ("    " if has_grp_transform else ""))
+            sub_xml = build_elements_xml(child, indent + ("    " if has_grp_transform else ""))
             if sub_xml.strip():
                 if has_grp_transform:
                     grp_attrs = []
@@ -274,11 +274,24 @@ def build_group_tree_xml(parent, indent="        "):
     return "\n".join(chunks)
 
 layer1 = root.find("{http://www.w3.org/2000/svg}g[@id=\"layer1\"]")
-body_content = build_group_tree_xml(layer1, indent="        ")
+bg_indices = [i for i, e in enumerate(layer1) if e.attrib.get("id", "").startswith("label_background_")]
+min_bg_idx = min(bg_indices) if bg_indices else 6
+max_bg_idx = max(bg_indices) if bg_indices else 55
+
+body_elements = list(layer1)[:min_bg_idx]
+labels_elements = list(layer1)[max_bg_idx + 1:]
+
+body_content = build_elements_xml(body_elements, indent="        ")
 body_drawable = generate_vector_drawable(body_content, has_aapt=True)
 with open(os.path.join(RES_DRAWABLE, "calc_body.xml"), "w", encoding="utf-8") as f:
     f.write(body_drawable)
 print("Generated calc_body.xml.")
+
+labels_content = build_elements_xml(labels_elements, indent="        ")
+labels_drawable = generate_vector_drawable(labels_content, has_aapt=False)
+with open(os.path.join(RES_DRAWABLE, "calc_labels.xml"), "w", encoding="utf-8") as f:
+    f.write(labels_drawable)
+print("Generated calc_labels.xml.")
 
 # 5. Generate CalcGeometry.kt
 def compute_path_bbox(d, tx=LAYER1_TX, ty=LAYER1_TY):
